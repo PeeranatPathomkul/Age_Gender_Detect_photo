@@ -56,7 +56,7 @@ Age_Gender_Detect_photo/
 
 1. **โคลนโปรเจค**
    ```bash
-   git clone https://github.com/yourusername/Age_Gender_Detect_photo.git
+   git clone https://github.com/PeeranatPathomkul/Age_Gender_Detect_photo.git
    cd Age_Gender_Detect_photo
    ```
 
