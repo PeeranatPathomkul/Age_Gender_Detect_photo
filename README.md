@@ -84,7 +84,7 @@ Age_Gender_Detect_photo/
 
 ### การใช้งาน
 
-#### ฝึกฝนโมเดลใหม่
+#### ฝึกฝนโมเดลใหม่ !ไม่ต้องทำ ถ้าจะ run แค่ web
 ```bash
 python create_model.py
 ```
