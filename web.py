@@ -128,8 +128,8 @@ def load_models():
     # กำหนดพาธของโมเดล
     face_model_path = "opencv_face_detector_uint8.pb"
     face_proto_path = "opencv_face_detector.pbtxt"
-    age_model_path = "age_model_improved.h5"
-    gender_model_path = "gender_model_improved.h5"
+    age_model_path = "models/age_model_best.h5"
+    gender_model_path = "models/gender_model_best.h5"
     
     # ตรวจสอบว่าโมเดลมีอยู่หรือไม่ ถ้าไม่มีให้แสดงข้อความแจ้งเตือน
     models_exist = all([os.path.exists(p) for p in [face_model_path, face_proto_path, age_model_path, gender_model_path]])
@@ -169,7 +169,7 @@ def load_models():
         return None, None, None
 
 # รายการอายุที่ทำนายได้
-ageList = ['0-2 years', '4-6 years', '8-12 years', '15-20 years', '25-32 years', '38-43 years', '48-53 years', '60-100 years']
+ageList = ['0-2 years', '4-6 years', '8-13 years', '15-20 years', '25-32 years', '38-43 years', '48-53 years', '60+ years']
 genderList = ['Female', 'Male']
 
 # ฟังก์ชันสำหรับตรวจจับใบหน้า
@@ -197,12 +197,22 @@ def highlightFace(net, frame, conf_threshold=0.7):
     return frameOpencvDnn, faceBoxes
 
 # ฟังก์ชันสำหรับ preprocess ภาพสำหรับโมเดลอายุ
+# เปลี่ยนเป็น
 def preprocess_for_age_model(face_img):
     try:
         # ปรับขนาดให้เหมาะกับโมเดลอายุ
-        face_resized = cv2.resize(face_img, (224, 224))
+        face_resized = cv2.resize(face_img, (144, 144))  # เปลี่ยนจาก 128 เป็น 144
+        
+        # เพิ่มการปรับปรุงภาพด้วย CLAHE เหมือนในโมเดลใหม่
+        lab = cv2.cvtColor(face_resized, cv2.COLOR_BGR2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        cl = clahe.apply(l_channel)
+        merged = cv2.merge((cl, a_channel, b_channel))
+        enhanced_face = cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
+        
         # Normalize ให้อยู่ในช่วง [0, 1]
-        face_normalized = face_resized.astype("float") / 255.0
+        face_normalized = enhanced_face.astype("float") / 255.0
         # เพิ่มมิติแรก (batch dimension)
         face_batch = np.expand_dims(face_normalized, axis=0)
         return face_batch
@@ -214,7 +224,7 @@ def preprocess_for_age_model(face_img):
 def preprocess_for_gender_model(face_img):
     try:
         # ปรับขนาดให้เหมาะกับโมเดลเพศ
-        face_resized = cv2.resize(face_img, (224, 224))  # CaffeNet ใช้ input size 227x227
+        face_resized = cv2.resize(face_img, (128, 128))  # CaffeNet ใช้ input size 227x227
         # Normalize ให้อยู่ในช่วง [0, 1]
         face_normalized = face_resized.astype("float") / 255.0
         # เพิ่มมิติแรก (batch dimension)
@@ -241,7 +251,7 @@ def predict_binary_gender(gender_preds):
     return gender, confidence
 
 # ฟังก์ชันสำหรับตัดภาพใบหน้าและปรับขนาดให้เท่ากัน
-def extract_face_with_fixed_size(frame, face_box, padding=20, target_size=(200, 200)):
+def extract_face_with_fixed_size(frame, face_box, padding=20, target_size=(400, 400)):
     try:
         x1, y1, x2, y2 = face_box
         
@@ -756,11 +766,34 @@ else:  # โหมดกล้องเว็บแคม
         result_placeholder = st.empty()  # placeholder สำหรับแสดงข้อมูลการวิเคราะห์
         
         # ปุ่มควบคุมการทำงาน
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            start_button = st.button("▶️ เริ่มการตรวจจับแบบเรียลไทม์", type="primary")
+            start_button = st.button("▶️ เริ่มการตรวจจับ", type="primary")
         with col2:
             stop_button = st.button("⏹️ หยุดการตรวจจับ", type="secondary")
+        
+        # ตัวเลือกการปรับประสิทธิภาพ
+        with col3:
+            frameskip = st.selectbox(
+                "ข้ามเฟรม (ลดแลค)",
+                options=[0, 1, 2, 3, 4],
+                index=0,
+                help="จำนวนเฟรมที่จะข้ามไปก่อนประมวลผลครั้งถัดไป ค่ายิ่งมากยิ่งลดแลค แต่อาจกระตุกได้"
+            )
+        
+        # ตัวเลือกขนาดภาพที่ใช้ประมวลผล
+        resolution_options = {
+            "ต่ำ (320x240)": (320, 240),
+            "กลาง (480x360)": (480, 360), 
+            "สูง (640x480)": (640, 480)
+        }
+        resolution = st.selectbox(
+            "ความละเอียด",
+            options=list(resolution_options.keys()),
+            index=1,
+            help="ความละเอียดต่ำจะทำงานได้เร็วกว่าแต่ภาพจะไม่คมชัด"
+        )
+        frameWidth, frameHeight = resolution_options[resolution]
         
         # ตั้งค่าสถานะการทำงาน
         if start_button:
@@ -769,23 +802,28 @@ else:  # โหมดกล้องเว็บแคม
             st.session_state.realtime_active = False
             
         # ตรวจสอบสถานะการทำงาน
-        if not 'realtime_active' in st.session_state:
+        if 'realtime_active' not in st.session_state:
             st.session_state.realtime_active = False
+        
+        # ตัวนับเฟรม (สำหรับการข้ามเฟรม)
+        if 'frame_count' not in st.session_state:
+            st.session_state.frame_count = 0
+        
+        # ภาพล่าสุดที่ประมวลผลและข้อมูลใบหน้า (เพื่อไม่ให้จอว่างขณะข้ามเฟรม)
+        if 'last_result_img' not in st.session_state:
+            st.session_state.last_result_img = None
+        if 'last_faces_data' not in st.session_state:
+            st.session_state.last_faces_data = []
             
         if st.session_state.realtime_active:
             status_placeholder.info("กำลังเปิดกล้องเพื่อตรวจจับใบหน้าแบบเรียลไทม์...")
             
             try:
-                # ตั้งค่ากล้อง
-                frameWidth = 640
-                frameHeight = 480
-                brightness = 180
-                
                 # เปิดการเชื่อมต่อกับกล้อง
                 cap = cv2.VideoCapture(selected_camera_index)
                 cap.set(3, frameWidth)
                 cap.set(4, frameHeight)
-                cap.set(10, brightness)
+                cap.set(10, 180)  # brightness
                 
                 # ตรวจสอบว่าเปิดกล้องได้หรือไม่
                 if not cap.isOpened():
@@ -794,60 +832,84 @@ else:  # โหมดกล้องเว็บแคม
                 else:
                     # ทำงานไปเรื่อยๆ จนกว่าจะหยุด
                     while st.session_state.realtime_active:
+                        # อ่านภาพจากกล้อง
                         success, img = cap.read()
                         if not success:
                             status_placeholder.error("ไม่สามารถรับภาพจากกล้องได้")
                             break
                         
-                        # แปลงสีจาก BGR เป็น RGB
-                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                        # เพิ่มตัวนับเฟรม
+                        st.session_state.frame_count += 1
                         
-                        # ประมวลผลภาพ
-                        result_img, faces_data, message = process_image(
-                            Image.fromarray(img_rgb), 
-                            faceNet, 
-                            ageModel, 
-                            genderModel, 
-                            confidence_threshold
-                        )
+                        # ตรวจสอบว่าควรประมวลผลเฟรมนี้หรือไม่ (ข้ามเฟรมเพื่อลดแลค)
+                        process_this_frame = (st.session_state.frame_count % (frameskip + 1) == 0)
                         
-                        # อัพเดตสถานะ
-                        status_placeholder.success(f"กำลังตรวจจับใบหน้าแบบเรียลไทม์... พบ {len(faces_data)} ใบหน้า")
-                        
-                        # แสดงผลบนหน้าเว็บ (อัพเดตทับตำแหน่งเดิม)
-                        frame_placeholder.image(result_img, caption="การตรวจจับแบบเรียลไทม์", use_column_width=True)
-                        
-                        # แสดงผลข้อมูลใบหน้า (อัพเดตทับตำแหน่งเดิม)
-                        # ส่วนแสดงผลข้อมูลใบหน้า (อัพเดตทับตำแหน่งเดิม)
-                        # Replace the existing block:
-                        if len(faces_data) > 0:
-                            st.markdown("<h3 style='color: white; text-align: left;'>👤 รายละเอียดใบหน้า</h3>", unsafe_allow_html=True)
+                        if process_this_frame:
+                            # ลดขนาดภาพลงเพื่อประมวลผลเร็วขึ้น (หากความละเอียดสูง)
+                            if frameWidth > 480:
+                                process_img = cv2.resize(img, (480, 360))
+                            else:
+                                process_img = img.copy()
                             
-                            # Delete the entire `face_html` generation block
+                            # แปลงสีจาก BGR เป็น RGB
+                            img_rgb = cv2.cvtColor(process_img, cv2.COLOR_BGR2RGB)
                             
-                            # Instead, you can add a simple text display if you want any output
-                            for i, face_data in enumerate(faces_data):
-                                st.write(f"ใบหน้าที่ {i+1}: {face_data['gender']} ({face_data['gender_confidence']:.1f}%), {face_data['age']} ({face_data['age_confidence']:.1f}%)")
-                        else:
-                            # Ensure result_placeholder is cleared
+                            # ประมวลผลภาพ
+                            try:
+                                result_img, faces_data, _ = process_image(
+                                    Image.fromarray(img_rgb), 
+                                    faceNet, 
+                                    ageModel, 
+                                    genderModel, 
+                                    confidence_threshold
+                                )
+                                
+                                # เก็บผลลัพธ์ล่าสุด
+                                st.session_state.last_result_img = result_img
+                                st.session_state.last_faces_data = faces_data
+                                
+                                # อัพเดตสถานะ
+                                status_placeholder.success(f"กำลังตรวจจับใบหน้า... พบ {len(faces_data)} ใบหน้า")
+                            except Exception as e:
+                                status_placeholder.error(f"เกิดข้อผิดพลาดในการประมวลผล: {str(e)}")
+                                continue
+                        
+                        # แสดงผลเฟรมล่าสุดที่ประมวลผล (แม้ว่าจะมีการข้ามเฟรม)
+                        if st.session_state.last_result_img is not None:
+                            frame_placeholder.image(
+                                st.session_state.last_result_img, 
+                                caption=f"การตรวจจับแบบเรียลไทม์ (ประมวลผลทุก {frameskip+1} เฟรม)",
+                                use_column_width=True
+                            )
+                        
+                        # แสดงผลข้อมูลใบหน้าล่าสุด (ไม่อัพเดตทุกเฟรม)
+                        if len(st.session_state.last_faces_data) > 0 and process_this_frame:
+                            # สร้างข้อความทั้งหมดก่อนแล้วอัพเดตพร้อมกันเพียงครั้งเดียว
+                            face_texts = []
+                            for i, face_data in enumerate(st.session_state.last_faces_data):
+                                face_texts.append(f"ใบหน้าที่ {i+1}: {face_data['gender']} ({face_data['gender_confidence']:.1f}%), {face_data['age']} ({face_data['age_confidence']:.1f}%)")
+                            
+                            # อัพเดต UI เพียงครั้งเดียว
+                            result_placeholder.text("\n".join(face_texts))
+                        elif len(st.session_state.last_faces_data) == 0 and process_this_frame:
                             result_placeholder.empty()
                         
                         # ตรวจสอบการกดปุ่มหยุด
                         if not st.session_state.realtime_active:
                             break
                             
-                        # รอเล็กน้อยเพื่อไม่ให้ CPU ทำงานหนักเกินไป
-                        time.sleep(0.03)
+                        # รอเล็กน้อยเพื่อให้ CPU ได้พัก
+                        time.sleep(0.01)
                     
-                # ปิดการใช้งานกล้อง
-                cap.release()
-                status_placeholder.info("หยุดการตรวจจับแล้ว")
-                
+                    # ปิดการใช้งานกล้อง
+                    cap.release()
+                    status_placeholder.info("หยุดการตรวจจับแล้ว")
+                    
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาดในการเริ่มการตรวจจับแบบเรียลไทม์: {e}")
                 st.session_state.realtime_active = False
         else:
-            status_placeholder.info("คลิกที่ปุ่ม 'เริ่มการตรวจจับแบบเรียลไทม์' เพื่อเริ่มใช้งาน")
+            status_placeholder.info("คลิกที่ปุ่ม 'เริ่มการตรวจจับ' เพื่อเริ่มใช้งาน")
 
 # แสดงส่วนท้ายเว็บไซต์
 st.markdown("<div class='footer'>Face Age Gender Detection App | พัฒนาด้วย Streamlit และ OpenCV</div>", unsafe_allow_html=True)
