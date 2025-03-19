@@ -52,7 +52,7 @@ Age_Gender_Detect_photo/
 ## 🔧 การติดตั้งและการใช้งาน
 
 ### ความต้องการของระบบ
-- Python 3.7 หรือสูงกว่า
+- Python 3.7 หรือสูงกว่า (แนะนำ 3.8)
 - TensorFlow 2.x
 - OpenCV
 - NumPy, Pandas, Matplotlib
@@ -70,11 +70,7 @@ Age_Gender_Detect_photo/
 
 2. **ติดตั้ง dependencies**
    ```bash
-   pip install -r requirements.txt
-   ```
-   หรือติดตั้งแต่ละแพ็คเกจแยกกัน:
-   ```bash
-   pip install tensorflow opencv-python numpy pandas matplotlib scikit-learn flask jupyter
+   pip install streamlit opencv-python numpy tensorflow pillow streamlit-webrtc av
    ```
 
 3. **ดาวน์โหลดข้อมูลและโมเดล** จาก Google Drive:
@@ -105,9 +101,9 @@ jupyter notebook age_model.ipynb
 jupyter notebook gender_model.ipynb
 ```
 
-#### เริ่มต้นเว็บแอปพลิเคชัน
+#### เริ่มต้นเว็บแอปพลิเคชัน ใช้ py 3.7-3.9 เท่านั้น
 ```bash
-py streamlit run web.py
+py -m streamlit run web.py
 ```
 เปิดเบราว์เซอร์และไปที่ `http://127.0.0.1:5000` เพื่อใช้งานเว็บแอปพลิเคชัน
 
