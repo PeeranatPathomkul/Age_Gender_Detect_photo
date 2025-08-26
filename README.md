@@ -74,7 +74,7 @@ Age_Gender_Detect_photo/
    ```
 
 3. **ดาวน์โหลดข้อมูลและโมเดล** จาก Google Drive:
-   - [โมเดลที่ฝึกฝนแล้ว]([https://drive.google.com/drive/folders/1Zj50mHmaOtpbl5kvi-XRrnAd-AulpDAQ?usp=sharing](https://storage.psu.ac.th/drive/d/s/14kLSOqef8e8gANfew6BATQVUZgcBgQx/tjBccQVgJooNZ1HnZNUQE9ya9M4uKaBx-xT4GCt4digw))
+   - โมเดลที่ฝึกฝนแล้ว :[https://drive.google.com/drive/folders/1Zj50mHmaOtpbl5kvi-XRrnAd-AulpDAQ?usp=sharing](https://storage.psu.ac.th/drive/d/s/14kLSOqef8e8gANfew6BATQVUZgcBgQx/tjBccQVgJooNZ1HnZNUQE9ya9M4uKaBx-xT4GCt4digw))
    - [ข้อมูลฝึกฝน](https://drive.google.com/drive/folders/1lqTRx8MjnDbq4hUrO5EPYTzRurasfD9W?usp=sharing)
 
 
